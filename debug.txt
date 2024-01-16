@@ -1,0 +1,5 @@
+Array
+(
+    [selected_size] => XL
+    [quantity] => 1
+)

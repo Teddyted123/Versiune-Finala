@@ -454,6 +454,28 @@ button[type="submit"]:hover {
     margin-bottom: 20px;
 }
 
+.product-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.single-pro-image {
+    flex: 1;
+    max-width: 40%; /* Adjust the maximum width for the image container */
+    /* Other styles for the image container */
+}
+
+.single-pro-details {
+    flex: 1;
+    max-width: 55%; /* Adjust the maximum width for the details container */
+    /* Other styles for the details container */
+}
+
+.star-rating {
+    /* Styles for star ratings */
+}
 
 
 

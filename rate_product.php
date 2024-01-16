@@ -1,38 +1,55 @@
 <?php
-// rate_product.php
-
-// Include your database connection
+session_start();
 include 'db_connection.php';
 
-// Assuming you receive the product ID and rating in the POST request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $productId = $_POST['productId'];
-    $rating = $_POST['rating'];
-    $userId = $_SESSION['user_id']; // Assuming you store the user ID in the session
+    // Verifică dacă utilizatorul este autentificat
+    if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
+        $userId = $_SESSION['id'];
+        $productId = $_POST['product_id'];
+        $rating = $_POST['rating'];
 
-    // Check if the user has already rated this product
-    $checkRatingQuery = "SELECT * FROM ratings WHERE product_id = $productId AND user_id = $userId";
-    $checkRatingResult = mysqli_query($conn, $checkRatingQuery);
+        // Verifică dacă utilizatorul a evaluat deja acest produs
+        $checkRatingQuery = "SELECT * FROM ratings WHERE user_id = ? AND product_id = ?";
+        $stmtCheckRating = mysqli_prepare($conn, $checkRatingQuery);
+        mysqli_stmt_bind_param($stmtCheckRating, 'ii', $userId, $productId);
+        mysqli_stmt_execute($stmtCheckRating);
+        $checkRatingResult = mysqli_stmt_get_result($stmtCheckRating);
 
-    if ($checkRatingResult && mysqli_num_rows($checkRatingResult) > 0) {
-        // User has already rated, update the existing rating
-        $updateQuery = "UPDATE ratings SET rating = $rating WHERE product_id = $productId AND user_id = $userId";
+        if (mysqli_num_rows($checkRatingResult) > 0) {
+            // Utilizatorul a evaluat deja produsul, așa că facem un UPDATE
+            $updateRatingQuery = "UPDATE ratings SET rating = ? WHERE user_id = ? AND product_id = ?";
+            $stmtUpdateRating = mysqli_prepare($conn, $updateRatingQuery);
+            mysqli_stmt_bind_param($stmtUpdateRating, 'iii', $rating, $userId, $productId);
+            mysqli_stmt_execute($stmtUpdateRating);
+        } else {
+            // Utilizatorul nu a evaluat încă produsul, așa că facem un INSERT
+            $insertRatingQuery = "INSERT INTO ratings (user_id, product_id, rating) VALUES (?, ?, ?)";
+            $stmtInsertRating = mysqli_prepare($conn, $insertRatingQuery);
+            mysqli_stmt_bind_param($stmtInsertRating, 'iii', $userId, $productId, $rating);
+            mysqli_stmt_execute($stmtInsertRating);
+        }
+
+        // Calculează ratingul mediu și actualizează tabela produselor
+        $averageRatingQuery = "SELECT AVG(rating) AS average FROM ratings WHERE product_id = ?";
+        $stmtAverageRating = mysqli_prepare($conn, $averageRatingQuery);
+        mysqli_stmt_bind_param($stmtAverageRating, 'i', $productId);
+        mysqli_stmt_execute($stmtAverageRating);
+        $averageRatingResult = mysqli_stmt_get_result($stmtAverageRating);
+
+        if ($averageRatingResult && $averageRatingData = mysqli_fetch_assoc($averageRatingResult)) {
+            $averageRating = round($averageRatingData['average']);
+            $updateProductRatingQuery = "UPDATE produse SET rating = ? WHERE id = ?";
+            $stmtUpdateProductRating = mysqli_prepare($conn, $updateProductRatingQuery);
+            mysqli_stmt_bind_param($stmtUpdateProductRating, 'ii', $averageRating, $productId);
+            mysqli_stmt_execute($stmtUpdateProductRating);
+        }
+
+        echo 'Rating updated successfully!';
     } else {
-        // User has not rated, insert a new rating
-        $updateQuery = "INSERT INTO ratings (product_id, user_id, rating) VALUES ($productId, $userId, $rating)";
-    }
-
-    $result = mysqli_query($conn, $updateQuery);
-
-    if ($result) {
-        // Return a success message or additional data if needed
-        echo json_encode(['success' => true]);
-    } else {
-        // Return an error message if the update fails
-        echo json_encode(['success' => false, 'error' => mysqli_error($conn)]);
+        echo 'Utilizatorul nu este autentificat.';
     }
 } else {
-    // Handle invalid requests
-    echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+    echo 'Cerere invalidă.';
 }
 ?>

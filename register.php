@@ -1,52 +1,75 @@
 <?php
-// Include the database connection file
-include 'db_connection.php';
+session_start();
 
-// Check if the $conn variable is defined
-if (!$conn) {
-    die("Database connection not available.");
+include("db_connection.php");
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+require 'vendor/autoload.php'; // Path to Composer autoload
+
+// Verificăm dacă utilizatorul a fost înregistrat cu succes și email-ul a fost trimis
+if (isset($_SESSION['registration_success'])) {
+    echo "
+        <script>
+            alert('You are registered successfully. Please check your email for verification.');
+        </script>";
+    unset($_SESSION['registration_success']); // Eliberăm sesiunea pentru a nu afișa mesajul de succes la reîncărcarea paginii
 }
 
-// Initialize variables to store user input
-$username = $password = $email = '';
-$error = '';
+// Verificăm dacă formularul a fost trimis
+if ($_SERVER['REQUEST_METHOD'] == "POST") {
+    $username = stripslashes($_POST['fullname']);
+    $username = mysqli_real_escape_string($conn, $username);
+    $email = stripslashes($_POST['email']);
+    $email = mysqli_real_escape_string($conn, $email);
+    $password = stripslashes($_POST['password']);
+    $password = mysqli_real_escape_string($conn, $password);
+    $password_hashed = password_hash($password, PASSWORD_DEFAULT);
+    $token = bin2hex(random_bytes(50));
 
-// Check if the form is submitted
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validate and sanitize user input
-    $username = htmlspecialchars(trim($_POST['fullname']));
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hash the password
-    $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+    // Insert user data into the database
+    $query = "INSERT into `users` (username, password, email, token, isEmailVerified)
+              VALUES ('$username', '$password_hashed', '$email', '$token', '0')";
+    $result = mysqli_query($conn, $query);
 
-    // Check if all required fields are filled
-    if (empty($username) || empty($password) || empty($email)) {
-        $error = "All fields are required.";
-    } else {
-        // Insert user data into the database
-        $query = "INSERT INTO users (username, password, email) VALUES (?, ?, ?)";
-        $stmt = $conn->prepare($query);
+    if ($result) {
+        // Send email verification
+        $mail = new PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->Host = 'smtp.gmail.com';
+            $mail->SMTPAuth = true;
+            $mail->Username = 'muscletedd@gmail.com'; // Your Gmail username
+            $mail->Password = 'gnjt hkgc gurj ribo'; // Your Gmail app password
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            $mail->Port = 465;
 
-        // Check if the statement is prepared successfully
-        if ($stmt) {
-            $stmt->bind_param("sss", $username, $password, $email);
+            //Recipients
+            $mail->setFrom('muscletedd@gmail.com', 'TrendyCloset'); // Your Gmail address and your name
+            $mail->addAddress($email, $username); // User's email and username
+            $mail->addReplyTo('muscletedd@gmail.com', 'TrendyCloset'); // Your Gmail address and your name
 
-            if ($stmt->execute()) {
-                // Registration successful
-                header("Location: login.php"); // Redirect to login page
-                exit();
-            } else {
-                // Registration failed
-                $error = "Registration failed. Please try again.";
-            }
+            //Content
+            $mail->isHTML(true);
+            $mail->Subject = 'Email Verification';
+            $mail->Body = "Click the following link to verify your email: <a href='http://localhost/Site%20PI/verify.php?token=$token'>Verify Email</a>";
 
-            $stmt->close();
-        } else {
-            // Statement preparation failed
-            $error = "Database error. Please try again later.";
+            $mail->send();
+
+            // Setăm variabila de sesiune pentru a afișa mesajul de succes
+            $_SESSION['registration_success'] = true;
+            header("Location: register.php"); // Redirectăm pentru a evita re-trimiterea formularului la reîncărcarea paginii
+            exit();
+        } catch (Exception $e) {
+            echo "Mailer Error: {$mail->ErrorInfo}";
         }
+    } else {
+        echo "Please enter some valid information!";
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -82,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="post" action="register.php">
             <div class="form-group">
                 <label for="fullname">Username:</label>
-                <input type="text" id="fullname" name="fullname" value="<?php echo $username; ?>" required>
+                <input type="text" id="fullname" name="fullname">
             </div>
             <div class="form-group">
                 <label for="email">Email:</label>
-                <input type="email" id="email" name="email" value="<?php echo $email; ?>" required>
+                <input type="email" id="email" name="email">
             </div>
             <div class="form-group">
                 <label for="password">Password:</label>

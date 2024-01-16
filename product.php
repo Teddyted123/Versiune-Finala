@@ -47,6 +47,10 @@ if (isset($_GET['id'])) {
             color: gold;
         }
     </style>
+    <script src="/Site PI/jquery3.7.1.js"></script>
+    <script src="script_v3.js"></script>
+    
+    
 </head>
 <body>
     <!-- Header Section -->
@@ -82,30 +86,37 @@ if (isset($_GET['id'])) {
         </div>
         <div class="single-pro-details">
             <h4><?php echo $productName; ?></h4>
-            <div class="star" id="ratingStars" data-product-id="<?php echo $productId; ?>">
+            <div class="star-rating" data-product-id="<?php echo $productId; ?>">
+            <!-- Rating Section -->
+        <div class="rating-section" data-product-id="<?php echo $productId; ?>">
+            <div class="star-rating" data-product-id="<?php echo $productId; ?>">
                 <?php
+                // Generare stele pentru ratingul mediu
                 for ($i = 1; $i <= 5; $i++) {
-                    if ($i <= $averageRating) {
-                        echo '<i class="fas fa-star rated"></i>';
-                    } else {
-                        echo '<i class="far fa-star"></i>';
-                    }
+                    $starClass = ($i <= $averageRating) ? 'rated' : '';
+                    echo '<span class="star ' . $starClass . '" data-value="' . $i . '" style="color: #ccc; font-size: 24px; cursor: pointer;">&#9733;</span>';
                 }
                 ?>
             </div>
+        </div>
+        </div>
             <h2><?php echo $productPrice; ?> RON</h2>
-            <select name="selected_size" required>
-              <option value="" disabled selected>Select size</option>
-              <option value="XXL">XXL</option>
-              <option value="XL">XL</option>
-              <option value="L">L</option>
-              <option value="M">M</option>
-              <option value="S">S</option>
-              <option value="XS">XS</option>
-            </select>
 
-            <input type="number" value="1">
-            <button class="normal addToCart" data-product-id="<?php echo $product['id']; ?>" data-product-size="selected_size">Add to Cart</button>
+            <form id="addToCartForm" action="add_to_cart.php" method="POST">
+                <select name="selected_size" required>
+                    <option value="" disabled selected>Select size</option>
+                    <option value="XXL">XXL</option>
+                    <option value="XL">XL</option>
+                    <option value="L">L</option>
+                    <option value="M">M</option>
+                    <option value="S">S</option>
+                    <option value="XS">XS</option>
+                </select>
+
+            <input type="number" name="quantity" value="1" min="1">
+            <button class="normal addToCart" data-product-id="<?php echo $productId; ?>">Add to Cart</button>
+            </form>
+            
             <h4>Product Details</h4>
             <span><?php echo $productDescription; ?></span>
         </div>
@@ -150,44 +161,47 @@ if (isset($_GET['id'])) {
         </div>
     </footer>
 
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script>
-    $(document).ready(function () {
-    <?php
-    // Check if the user is logged in
-    if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
-        echo '
-        $(".addToCart").click(function () {
-            var productId = $(this).data("product-id");
 
-            $.ajax({
-                type: "POST",
-                url: "add_to_cart.php",
-                data: {
-                    productId: productId
-                },
-                dataType: "json",
-                success: function (response) {
-                    if (response.success) {
-                        // Optional: Handle success, e.g., show a confirmation message
-                        console.log("Product added to cart successfully");
-                    } else {
-                        // Optional: Handle error, e.g., show an error message
-                        console.error("Error adding product to cart: " + response.error);
-                    }
-                },
-                error: function () {
-                    // Optional: Handle AJAX error
-                    console.error("Error adding product to cart");
-                }
-            });
+<script>
+$(document).ready(function () {
+    // Handle star hover effect
+    $('.star-rating .star').hover(function () {
+        var currentStar = parseInt($(this).attr('data-value'));
+        $(this).css('color', 'yellow'); // Change color for the hovered star
+        $(this).prevAll('.star').css('color', 'yellow'); // Change color for previous stars
+    }, function () {
+        $(this).parent().find('.star').css('color', '#ccc'); // Reset all stars to default color
+    });
+
+    // Handle star click event
+    $('.star-rating .star').click(function () {
+        var ratingValue = parseInt($(this).attr('data-value'));
+        var productId = $(this).parent().attr('data-product-id');
+
+        // Update the UI based on the selected rating
+        $(this).parent().find('.star').css('color', '#ccc'); // Reset all stars to default color
+        for (var i = 1; i <= ratingValue; i++) {
+            $(this).parent().find('.star[data-value="' + i + '"]').css('color', 'yellow'); // Change color for selected stars
+        }
+
+        // Send the AJAX request to the server
+        $.ajax({
+            url: 'rate_product.php',
+            method: 'POST',
+            data: {
+                product_id: productId,
+                rating: ratingValue
+            },
+            success: function (response) {
+                alert(response);
+            }
         });
-        ';
-    }
-    ?>
-});
 
-    </script>
+        
+
+    });
+});
+</script>
 
 </body>
 </html>

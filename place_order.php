@@ -2,37 +2,101 @@
 session_start();
 include 'db_connection.php';
 
-// Check if the user is logged in
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
-    // Redirect to the login page or handle the situation when the user is not logged in
-    header('Location: login.php');
-    exit;
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+require 'vendor/autoload.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verifică dacă utilizatorul este autentificat
+    if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
+        $userId = $_SESSION['id'];
+        $name = mysqli_real_escape_string($conn, $_POST['name']);
+        $address = mysqli_real_escape_string($conn, $_POST['address']);
+
+        // Începe o tranzacție pentru a asigura consistența datelor în baza de date
+        mysqli_begin_transaction($conn);
+
+        try {
+            // Adaugă comanda în tabela 'orders'
+            $orderInsertQuery = "INSERT INTO orders (user_id) VALUES ($userId)";
+            $orderInsertResult = mysqli_query($conn, $orderInsertQuery);
+
+            if (!$orderInsertResult) {
+                throw new Exception("Error adding order to database.");
+            }
+
+            // Obține ID-ul comenzii recent adăugate
+            $orderId = mysqli_insert_id($conn);
+
+            // Golește coșul de cumpărături pentru utilizator
+            $clearCartQuery = "DELETE FROM cart WHERE user_id = $userId";
+            $clearCartResult = mysqli_query($conn, $clearCartQuery);
+
+            if (!$clearCartResult) {
+                throw new Exception("Error clearing cart.");
+            }
+
+            // Confirmă tranzacția dacă toate acțiunile au fost executate cu succes
+            mysqli_commit($conn);
+
+            // Obține adresa de email și numele utilizatorului din baza de date
+            $queryUserData = "SELECT email, username FROM users WHERE id = $userId";
+            $resultUserData = mysqli_query($conn, $queryUserData);
+
+            if ($resultUserData && mysqli_num_rows($resultUserData) > 0) {
+                $userData = mysqli_fetch_assoc($resultUserData);
+                $email = $userData['email'];
+                $username = $userData['username'];
+
+                // Trimite confirmarea pe email (folosind PHPMailer)
+                sendConfirmationEmail($email, $name, $address);
+
+                // Afișează un mesaj de succes
+                echo 'Order placed successfully!';
+            } else {
+                echo 'Error retrieving user data.';
+            }
+        } catch (Exception $e) {
+            // Rollback la tranzacție în caz de eroare
+            mysqli_rollback($conn);
+            echo 'Error: ' . $e->getMessage();
+        }
+    } else {
+        echo 'User not logged in.';
+    }
+} else {
+    // Handle invalid request method
+    echo 'Invalid request method.';
 }
 
-// Fetch cart items for the logged-in user
-$userId = $_SESSION['user_id']; // Adjust this based on your actual session variable name
-$cartItems = $_SESSION['cart'];
+function sendConfirmationEmail($email, $name, $address) {
+    $mail = new PHPMailer(true);
 
-// Insert order into the orders table
-$query = "INSERT INTO orders (user_id) VALUES ($userId)";
-mysqli_query($conn, $query);
+    try {
+        $mail->isSMTP();
+        $mail->Host = 'smtp.gmail.com';
+        $mail->SMTPAuth = true;
+        $mail->Username = 'muscletedd@gmail.com'; // Your Gmail username
+        $mail->Password = 'gnjt hkgc gurj ribo'; // Your Gmail app password
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port = 465;
 
-// Get the order ID
-$orderId = mysqli_insert_id($conn);
+        //Recipients
+        $mail->setFrom('muscletedd@gmail.com', 'TrendyCloset'); // Your Gmail address and your name
+        $mail->addAddress($email); // User's email
+        $mail->addReplyTo('muscletedd@gmail.com', 'TrendyCloset'); // Your Gmail address and your name
 
-// Insert cart items into the order_items table
-foreach ($cartItems as $productId) {
-    $query = "INSERT INTO order_items (order_id, product_id) VALUES ($orderId, $productId)";
-    mysqli_query($conn, $query);
+        //Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Order Confirmation';
+        $mail->Body = "Hello $name,\n\nThank you for placing your order!\n\nYour order will be shipped to:\n$address";
+
+        $mail->send();
+    } catch (Exception $e) {
+        echo "Mailer Error: {$mail->ErrorInfo}";
+    }
 }
 
-// Clear the cart
-$_SESSION['cart'] = [];
-
-// Close the connection
-mysqli_close($conn);
-
-// Redirect to a thank you page or display a success message
-header('Location: thank_you.php');
-exit;
 ?>

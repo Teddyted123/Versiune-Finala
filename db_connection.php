@@ -1,14 +1,13 @@
 <?php
-
 $dbhost = "localhost";
 $dbuser = "root";
 $dbpass = "";
 $dbname = "produse_db";
 
-if(!$conn = mysqli_connect($dbhost,$dbuser,$dbpass,$dbname))
-{
+// Crează conexiunea
+$conn = mysqli_connect($dbhost, $dbuser, $dbpass, $dbname);
 
-    die("failed to connect!");
+if (!$conn) {
+    die("Failed to connect to the database: " . mysqli_connect_error());
 }
-
 ?>
